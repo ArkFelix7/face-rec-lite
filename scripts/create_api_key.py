@@ -22,7 +22,7 @@ import sys
 # directly (i.e. ``python scripts/create_api_key.py …``).
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from passlib.hash import bcrypt  # noqa: E402  (after sys.path insert)
+import bcrypt as _bcrypt  # noqa: E402  (after sys.path insert)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: E402
 
 from app.config import settings  # noqa: E402
@@ -47,7 +47,10 @@ async def create_key(name: str, rate_limit: int = 100) -> str:
     key_prefix = raw_key[8:16]  # First 8 chars of the random portion — unique per key
 
     # Hash with the configured bcrypt work factor.
-    key_hash = bcrypt.hash(raw_key, rounds=settings.bcrypt_rounds)
+    key_hash = _bcrypt.hashpw(
+        raw_key.encode("utf-8"),
+        _bcrypt.gensalt(rounds=settings.bcrypt_rounds),
+    ).decode("utf-8")
 
     engine = create_async_engine(settings.database_url)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

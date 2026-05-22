@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import secrets
 
-from passlib.hash import bcrypt
+import bcrypt as _bcrypt
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -78,8 +78,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 )
 
             # Verify the full key against the stored bcrypt hash.
+            # Use bcrypt directly — passlib 1.7.4 + bcrypt 4.x has a silent
+            # verification bug where checkpw always fails.
             try:
-                valid = bcrypt.verify(raw_key, api_key.key_hash)
+                valid = _bcrypt.checkpw(
+                    raw_key.encode("utf-8"),
+                    api_key.key_hash.encode("utf-8"),
+                )
             except Exception:
                 valid = False
 
