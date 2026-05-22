@@ -1,0 +1,64 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://faceapi:faceapi@postgres:5432/facedb
+      - REDIS_URL=redis://redis:6379/0
+      - ML_DEVICE=cpu
+      - INSIGHTFACE_MODEL_DIR=/app/models
+      - APP_ENV=development
+      - APP_LOG_LEVEL=debug
+      - MIN_QUALITY_SCORE=0.5
+      - MIN_FACE_SIZE_PX=80
+      - MAX_PITCH_DEG=30.0
+      - MAX_YAW_DEG=35.0
+      - MAX_ROLL_DEG=25.0
+      - DEFAULT_VERIFICATION_THRESHOLD=0.60
+      - MAX_FACES_PER_USER=5
+      - DEDUP_THRESHOLD=0.95
+      - DEFAULT_RATE_LIMIT_RPM=100
+      - BCRYPT_ROUNDS=12
+    volumes:
+      - ./models:/app/models
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  postgres:
+    image: pgvector/pgvector:pg15
+    environment:
+      POSTGRES_USER: faceapi
+      POSTGRES_PASSWORD: faceapi
+      POSTGRES_DB: facedb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U faceapi -d facedb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
