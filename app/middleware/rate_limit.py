@@ -14,9 +14,12 @@ On every non-public request it calls the Redis-backed
 
 from __future__ import annotations
 
+import os
 import time
 
 from starlette.middleware.base import BaseHTTPMiddleware
+
+_AUTH_DISABLED = os.environ.get("DISABLE_AUTH", "").lower() in ("true", "1", "yes")
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -27,6 +30,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """Starlette middleware that enforces per-API-key request rate limits."""
 
     async def dispatch(self, request: Request, call_next) -> Response:
+        if _AUTH_DISABLED:
+            return await call_next(request)
+
         # Public paths bypass rate limiting.
         if request.url.path in PUBLIC_PATHS:
             return await call_next(request)

@@ -13,6 +13,7 @@ Public paths that bypass authentication:
 
 from __future__ import annotations
 
+import os
 import secrets
 
 import bcrypt as _bcrypt
@@ -24,6 +25,9 @@ from app.dependencies import get_async_session_maker
 from app.services.database import DatabaseService
 
 PUBLIC_PATHS: frozenset[str] = frozenset({"/v1/health", "/v1/ready", "/v1/metrics"})
+
+# Set DISABLE_AUTH=true to skip authentication (local dev only).
+_AUTH_DISABLED = os.environ.get("DISABLE_AUTH", "").lower() in ("true", "1", "yes")
 
 
 def _error_response(status_code: int, code: str, message: str, request_id: str) -> JSONResponse:
@@ -43,6 +47,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
     """Starlette middleware that authenticates every non-public request."""
 
     async def dispatch(self, request: Request, call_next) -> Response:
+        if _AUTH_DISABLED:
+            return await call_next(request)
+
         # Skip authentication for public endpoints.
         if request.url.path in PUBLIC_PATHS:
             return await call_next(request)
