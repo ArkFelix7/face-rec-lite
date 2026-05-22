@@ -211,11 +211,11 @@
 <div class="config-bar">
   <div class="field">
     <label>API Base URL</label>
-    <input id="api-url" value="http://localhost:8000" placeholder="http://localhost:8000">
+    <input id="api-url" value="http://localhost:8000" placeholder="http://localhost:8000" oninput="localStorage.setItem('frl_url', this.value)">
   </div>
   <div class="field">
     <label>API Key</label>
-    <input id="api-key" type="password" placeholder="sk_live_..." value="">
+    <input id="api-key" type="password" placeholder="sk_live_..." value="" oninput="localStorage.setItem('frl_key', this.value)">
   </div>
   <button class="btn-outline btn-sm" onclick="checkHealth()">Check</button>
 </div>
@@ -369,6 +369,14 @@ let verifyFileB64 = null;
 // Helpers
 // -----------------------------------------------------------------------
 const $ = id => document.getElementById(id);
+
+// Restore saved API key and URL from localStorage
+(function() {
+  const key = localStorage.getItem('frl_key');
+  const url = localStorage.getItem('frl_url');
+  if (key) $('api-key').value = key;
+  if (url) $('api-url').value = url;
+})();
 const apiUrl = () => $('api-url').value.replace(/\/$/, '');
 const apiKey  = () => $('api-key').value.trim();
 const headers = () => ({
