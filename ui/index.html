@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Face Recognition — Test UI</title>
+<style>
+  :root {
+    --bg: #0f0f11;
+    --surface: #1a1a1f;
+    --border: #2d2d35;
+    --accent: #6366f1;
+    --accent-hover: #818cf8;
+    --success: #22c55e;
+    --error: #ef4444;
+    --warn: #f59e0b;
+    --text: #e2e2e9;
+    --muted: #71717a;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-size: 1rem; font-weight: 600; margin-bottom: 16px; color: var(--text); }
+  .header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 28px; padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .badge {
+    background: var(--accent); color: #fff;
+    font-size: 0.65rem; font-weight: 700; padding: 2px 8px;
+    border-radius: 99px; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--muted); margin-left: auto;
+  }
+  .status-dot.ok { background: var(--success); }
+  .status-dot.err { background: var(--error); }
+
+  .layout { display: grid; grid-template-columns: 360px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+
+  label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }
+  input, select, textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 0.875rem; padding: 8px 10px;
+    outline: none; transition: border-color .15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 60px; }
+
+  .field { margin-bottom: 14px; }
+
+  button {
+    padding: 9px 18px; border-radius: 6px; font-size: 0.875rem; font-weight: 600;
+    cursor: pointer; border: none; transition: background .15s, opacity .15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-sm { padding: 5px 12px; font-size: 0.75rem; }
+  .btn-danger { background: #7f1d1d; color: #fca5a5; }
+  .btn-danger:hover { background: #991b1b; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab {
+    padding: 7px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; color: var(--muted); background: transparent; border: none;
+    transition: all .15s;
+  }
+  .tab.active { background: var(--accent); color: #fff; }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Camera / Preview */
+  .cam-wrap {
+    position: relative; width: 100%; aspect-ratio: 4/3;
+    background: #000; border-radius: 8px; overflow: hidden;
+    margin-bottom: 12px; border: 1px solid var(--border);
+  }
+  #cam-video, #enroll-video { width: 100%; height: 100%; object-fit: cover; }
+  .cam-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 0.8rem;
+    pointer-events: none;
+  }
+  .face-frame {
+    position: absolute; top: 50%; left: 50%;
+    width: 160px; height: 200px;
+    border: 2px solid rgba(99,102,241,0.6);
+    border-radius: 50% / 45%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.35);
+  }
+  canvas { display: none; }
+
+  /* Preview image */
+  .preview-img {
+    width: 100%; border-radius: 8px; margin-bottom: 12px;
+    border: 1px solid var(--border); object-fit: cover;
+    max-height: 240px; display: none;
+  }
+
+  /* Results */
+  .result-box {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px; font-size: 0.8rem;
+    font-family: 'Menlo', monospace; white-space: pre-wrap;
+    word-break: break-all; max-height: 320px; overflow-y: auto;
+    color: var(--muted); margin-top: 12px;
+  }
+  .result-box.success { border-color: var(--success); color: var(--success); }
+  .result-box.error   { border-color: var(--error);   color: var(--error); }
+
+  /* Match banner */
+  .match-banner {
+    display: none; text-align: center; padding: 18px;
+    border-radius: 8px; margin-bottom: 16px; font-size: 1.1rem; font-weight: 700;
+  }
+  .match-banner.match   { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid var(--success); }
+  .match-banner.nomatch { background: rgba(239,68,68,0.15);  color: var(--error);   border: 1px solid var(--error); }
+
+  /* Faces grid */
+  .faces-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+  .face-card {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px; text-align: center; font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .face-card .face-icon { font-size: 2rem; margin-bottom: 6px; }
+  .face-card .face-label { color: var(--text); font-weight: 600; margin-bottom: 2px; }
+  .face-card .quality-bar {
+    height: 3px; border-radius: 2px; background: var(--border); margin: 4px 0;
+  }
+  .face-card .quality-fill { height: 100%; border-radius: 2px; background: var(--accent); }
+
+  /* Quality score ring */
+  .quality-ring { font-size: 2rem; font-weight: 800; }
+  .quality-ring.good { color: var(--success); }
+  .quality-ring.warn { color: var(--warn); }
+  .quality-ring.bad  { color: var(--error); }
+
+  /* Metrics list */
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .metric-item {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 12px;
+  }
+  .metric-item .label { font-size: 0.7rem; color: var(--muted); margin-bottom: 2px; }
+  .metric-item .value { font-size: 1rem; font-weight: 700; }
+
+  .sep { height: 1px; background: var(--border); margin: 16px 0; }
+  .flex { display: flex; gap: 8px; align-items: center; }
+  .flex-end { justify-content: flex-end; }
+  .text-sm { font-size: 0.75rem; color: var(--muted); }
+  .mt-2 { margin-top: 8px; }
+  .mt-3 { margin-top: 12px; }
+  .spin { animation: spin 1s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none !important; }
+
+  /* Config bar */
+  .config-bar {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 18px;
+    display: flex; gap: 12px; align-items: flex-end;
+    margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .config-bar .field { margin-bottom: 0; flex: 1; min-width: 160px; }
+
+  /* Source toggle */
+  .source-toggle { display: flex; gap: 4px; margin-bottom: 12px; }
+  .src-btn {
+    flex: 1; padding: 7px; border-radius: 6px; font-size: 0.75rem;
+    font-weight: 600; cursor: pointer; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); transition: all .15s;
+  }
+  .src-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Face Recognition</h1>
+  <span class="badge">Beta</span>
+  <span id="api-status" class="status-dot" title="API status"></span>
+</div>
+
+<!-- Config bar -->
+<div class="config-bar">
+  <div class="field">
+    <label>API Base URL</label>
+    <input id="api-url" value="http://localhost:8000" placeholder="http://localhost:8000">
+  </div>
+  <div class="field">
+    <label>API Key</label>
+    <input id="api-key" type="password" placeholder="sk_live_..." value="">
+  </div>
+  <button class="btn-outline btn-sm" onclick="checkHealth()">Check</button>
+</div>
+
+<div class="layout">
+  <!-- Left panel: controls -->
+  <div>
+    <div class="panel">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('enroll')">Enroll Face</button>
+        <button class="tab" onclick="switchTab('verify')">Verify Face</button>
+        <button class="tab" onclick="switchTab('manage')">Manage</button>
+      </div>
+
+      <!-- ENROLL TAB -->
+      <div id="tab-enroll" class="tab-panel active">
+        <div class="field">
+          <label>User ID</label>
+          <input id="enroll-user" placeholder="alice" value="alice">
+        </div>
+        <div class="field">
+          <label>Label (optional)</label>
+          <input id="enroll-label" placeholder="front-facing">
+        </div>
+
+        <div class="source-toggle">
+          <button class="src-btn active" id="enroll-src-cam" onclick="setEnrollSource('cam')">📷 Camera</button>
+          <button class="src-btn" id="enroll-src-file" onclick="setEnrollSource('file')">📁 File</button>
+        </div>
+
+        <!-- Camera -->
+        <div id="enroll-cam-section">
+          <div class="cam-wrap">
+            <video id="enroll-video" autoplay playsinline muted></video>
+            <div class="face-frame"></div>
+            <div class="cam-overlay" id="enroll-cam-overlay">Click "Start Camera"</div>
+          </div>
+          <canvas id="enroll-canvas"></canvas>
+          <div class="flex">
+            <button class="btn-outline btn-sm" onclick="startCamera('enroll')">Start Camera</button>
+            <button class="btn-primary btn-sm" onclick="captureAndEnroll()" id="enroll-capture-btn" disabled>Capture &amp; Enroll</button>
+          </div>
+        </div>
+
+        <!-- File upload -->
+        <div id="enroll-file-section" class="hidden">
+          <input type="file" id="enroll-file" accept="image/*" onchange="previewEnrollFile(event)">
+          <img id="enroll-preview" class="preview-img" alt="preview">
+          <button class="btn-primary mt-2" onclick="enrollFromFile()" id="enroll-file-btn" disabled>Enroll from File</button>
+        </div>
+
+        <div id="enroll-result" class="result-box hidden"></div>
+      </div>
+
+      <!-- VERIFY TAB -->
+      <div id="tab-verify" class="tab-panel">
+        <div class="field">
+          <label>User ID to verify against</label>
+          <input id="verify-user" placeholder="alice" value="alice">
+        </div>
+        <div class="field">
+          <label>Threshold (0–1, default 0.60)</label>
+          <input id="verify-threshold" type="number" min="0" max="1" step="0.01" value="0.60">
+        </div>
+
+        <div class="source-toggle">
+          <button class="src-btn active" id="verify-src-cam" onclick="setVerifySource('cam')">📷 Camera</button>
+          <button class="src-btn" id="verify-src-file" onclick="setVerifySource('file')">📁 File</button>
+        </div>
+
+        <!-- Camera -->
+        <div id="verify-cam-section">
+          <div class="cam-wrap">
+            <video id="cam-video" autoplay playsinline muted></video>
+            <div class="face-frame"></div>
+            <div class="cam-overlay" id="verify-cam-overlay">Click "Start Camera"</div>
+          </div>
+          <canvas id="verify-canvas"></canvas>
+          <div class="flex">
+            <button class="btn-outline btn-sm" onclick="startCamera('verify')">Start Camera</button>
+            <button class="btn-primary btn-sm" onclick="captureAndVerify()" id="verify-capture-btn" disabled>Capture &amp; Verify</button>
+          </div>
+        </div>
+
+        <!-- File upload -->
+        <div id="verify-file-section" class="hidden">
+          <input type="file" id="verify-file" accept="image/*" onchange="previewVerifyFile(event)">
+          <img id="verify-preview" class="preview-img" alt="preview">
+          <button class="btn-primary mt-2" onclick="verifyFromFile()" id="verify-file-btn" disabled>Verify from File</button>
+        </div>
+      </div>
+
+      <!-- MANAGE TAB -->
+      <div id="tab-manage" class="tab-panel">
+        <div class="field">
+          <label>User ID</label>
+          <input id="manage-user" placeholder="alice" value="alice">
+        </div>
+        <div class="flex mt-2">
+          <button class="btn-primary btn-sm" onclick="createUser()">Create User</button>
+          <button class="btn-outline btn-sm" onclick="listFaces()">List Faces</button>
+          <button class="btn-danger btn-sm" onclick="deleteUser()">Delete User</button>
+        </div>
+        <div id="manage-result" class="result-box hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel: results -->
+  <div>
+    <!-- Verify result banner -->
+    <div id="match-banner" class="match-banner"></div>
+
+    <!-- Verify details panel -->
+    <div id="verify-result-panel" class="panel hidden">
+      <h2>Verification Result</h2>
+      <div class="metrics" id="verify-metrics"></div>
+      <div id="verify-scores" class="mt-3"></div>
+      <div id="verify-quality" class="mt-3"></div>
+    </div>
+
+    <!-- Enroll quality panel -->
+    <div id="enroll-quality-panel" class="panel hidden">
+      <h2>Enrollment Quality</h2>
+      <div class="metrics" id="enroll-metrics"></div>
+    </div>
+
+    <!-- Faces list -->
+    <div id="faces-panel" class="panel hidden mt-3" style="margin-top:16px">
+      <div class="flex" style="margin-bottom:14px">
+        <h2 style="margin:0">Enrolled Faces</h2>
+        <span id="faces-count" class="text-sm" style="margin-left:auto"></span>
+      </div>
+      <div id="faces-grid" class="faces-grid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// -----------------------------------------------------------------------
+// State
+// -----------------------------------------------------------------------
+let enrollStream = null;
+let verifyStream = null;
+let enrollSource = 'cam';
+let verifySource = 'cam';
+let enrollFileB64 = null;
+let verifyFileB64 = null;
+
+// -----------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------
+const $ = id => document.getElementById(id);
+const apiUrl = () => $('api-url').value.replace(/\/$/, '');
+const apiKey  = () => $('api-key').value.trim();
+const headers = () => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${apiKey()}`
+});
+
+async function apiFetch(path, opts = {}) {
+  const resp = await fetch(apiUrl() + path, { headers: headers(), ...opts });
+  return resp.json();
+}
+
+function showResult(elId, data, isError = false) {
+  const el = $(elId);
+  el.textContent = JSON.stringify(data, null, 2);
+  el.className = 'result-box ' + (isError ? 'error' : 'success');
+}
+
+function hideResult(elId) {
+  $(elId).className = 'result-box hidden';
+}
+
+// -----------------------------------------------------------------------
+// Tabs
+// -----------------------------------------------------------------------
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['enroll','verify','manage'][i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  $('tab-' + name).classList.add('active');
+
+  if (name === 'manage') listFaces();
+}
+
+// -----------------------------------------------------------------------
+// Health check
+// -----------------------------------------------------------------------
+async function checkHealth() {
+  try {
+    const r = await fetch(apiUrl() + '/v1/health');
+    const ok = r.ok;
+    $('api-status').className = 'status-dot ' + (ok ? 'ok' : 'err');
+  } catch {
+    $('api-status').className = 'status-dot err';
+  }
+}
+checkHealth();
+
+// -----------------------------------------------------------------------
+// Source toggle
+// -----------------------------------------------------------------------
+function setEnrollSource(src) {
+  enrollSource = src;
+  $('enroll-src-cam').classList.toggle('active', src === 'cam');
+  $('enroll-src-file').classList.toggle('active', src === 'file');
+  $('enroll-cam-section').classList.toggle('hidden', src !== 'cam');
+  $('enroll-file-section').classList.toggle('hidden', src !== 'file');
+}
+
+function setVerifySource(src) {
+  verifySource = src;
+  $('verify-src-cam').classList.toggle('active', src === 'cam');
+  $('verify-src-file').classList.toggle('active', src === 'file');
+  $('verify-cam-section').classList.toggle('hidden', src !== 'cam');
+  $('verify-file-section').classList.toggle('hidden', src !== 'file');
+}
+
+// -----------------------------------------------------------------------
+// Camera
+// -----------------------------------------------------------------------
+async function startCamera(which) {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+    if (which === 'enroll') {
+      if (enrollStream) enrollStream.getTracks().forEach(t => t.stop());
+      enrollStream = stream;
+      $('enroll-video').srcObject = stream;
+      $('enroll-cam-overlay').style.display = 'none';
+      $('enroll-capture-btn').disabled = false;
+    } else {
+      if (verifyStream) verifyStream.getTracks().forEach(t => t.stop());
+      verifyStream = stream;
+      $('cam-video').srcObject = stream;
+      $('verify-cam-overlay').style.display = 'none';
+      $('verify-capture-btn').disabled = false;
+    }
+  } catch (e) {
+    alert('Camera error: ' + e.message);
+  }
+}
+
+function captureFrame(videoId, canvasId) {
+  const video = $(videoId);
+  const canvas = $(canvasId);
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  return canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+}
+
+// -----------------------------------------------------------------------
+// File preview
+// -----------------------------------------------------------------------
+function fileToB64(file) {
+  return new Promise(resolve => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result.split(',')[1]);
+    r.readAsDataURL(file);
+  });
+}
+
+async function previewEnrollFile(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const b64 = await fileToB64(file);
+  enrollFileB64 = b64;
+  const preview = $('enroll-preview');
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = 'block';
+  $('enroll-file-btn').disabled = false;
+}
+
+async function previewVerifyFile(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const b64 = await fileToB64(file);
+  verifyFileB64 = b64;
+  const preview = $('verify-preview');
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = 'block';
+  $('verify-file-btn').disabled = false;
+}
+
+// -----------------------------------------------------------------------
+// Enroll
+// -----------------------------------------------------------------------
+async function doEnroll(imageB64) {
+  const userId = $('enroll-user').value.trim();
+  const label  = $('enroll-label').value.trim() || null;
+  if (!userId) { alert('Enter a user ID'); return; }
+
+  // Ensure user exists
+  await apiFetch('/v1/users', {
+    method: 'POST',
+    body: JSON.stringify({ external_id: userId })
+  });
+
+  const resp = await apiFetch(`/v1/users/${userId}/faces`, {
+    method: 'POST',
+    body: JSON.stringify({ image: imageB64, label })
+  });
+
+  if (resp.success) {
+    showResult('enroll-result', resp);
+    renderEnrollQuality(resp.data);
+    listFaces();
+  } else {
+    showResult('enroll-result', resp, true);
+  }
+}
+
+async function captureAndEnroll() {
+  const b64 = captureFrame('enroll-video', 'enroll-canvas');
+  await doEnroll(b64);
+}
+async function enrollFromFile() {
+  if (!enrollFileB64) return;
+  await doEnroll(enrollFileB64);
+}
+
+function renderEnrollQuality(data) {
+  if (!data || !data.quality_metrics) return;
+  const q = data.quality_metrics;
+  const panel = $('enroll-quality-panel');
+  panel.classList.remove('hidden');
+  const score = Math.round(q.overall_score * 100);
+  const cls = score >= 70 ? 'good' : score >= 50 ? 'warn' : 'bad';
+  $('enroll-metrics').innerHTML = `
+    <div class="metric-item">
+      <div class="label">Overall Quality</div>
+      <div class="value quality-ring ${cls}">${score}%</div>
+    </div>
+    <div class="metric-item">
+      <div class="label">Blur Score</div>
+      <div class="value">${Math.round(q.blur_score * 100)}%</div>
+    </div>
+    <div class="metric-item">
+      <div class="label">Brightness</div>
+      <div class="value">${Math.round(q.brightness * 100)}%</div>
+    </div>
+    <div class="metric-item">
+      <div class="label">Confidence</div>
+      <div class="value">${Math.round(q.face_confidence * 100)}%</div>
+    </div>
+    <div class="metric-item">
+      <div class="label">Face Size</div>
+      <div class="value">${q.face_size.width_px}×${q.face_size.height_px}px</div>
+    </div>
+    <div class="metric-item">
+      <div class="label">Head Pose</div>
+      <div class="value">${q.head_pose.yaw_deg.toFixed(1)}° yaw</div>
+    </div>
+    ${data.duplicate ? `<div class="metric-item" style="grid-column:1/-1"><div class="label">⚠️ Duplicate</div><div class="value text-sm">${data.message || 'Already enrolled'}</div></div>` : ''}
+  `;
+}
+
+// -----------------------------------------------------------------------
+// Verify
+// -----------------------------------------------------------------------
+async function doVerify(imageB64) {
+  const userId    = $('verify-user').value.trim();
+  const threshold = parseFloat($('verify-threshold').value) || 0.60;
+  if (!userId) { alert('Enter a user ID'); return; }
+
+  const resp = await apiFetch(`/v1/users/${userId}/verify`, {
+    method: 'POST',
+    body: JSON.stringify({ image: imageB64, threshold })
+  });
+
+  renderVerifyResult(resp);
+}
+
+async function captureAndVerify() {
+  const b64 = captureFrame('cam-video', 'verify-canvas');
+  await doVerify(b64);
+}
+async function verifyFromFile() {
+  if (!verifyFileB64) return;
+  await doVerify(verifyFileB64);
+}
+
+function renderVerifyResult(resp) {
+  const banner = $('match-banner');
+  const panel  = $('verify-result-panel');
+
+  if (!resp.success) {
+    banner.className = 'match-banner nomatch';
+    banner.style.display = 'block';
+    banner.textContent = `❌  ${resp.error?.message || 'Verification failed'}`;
+    panel.classList.add('hidden');
+    return;
+  }
+
+  const d = resp.data;
+  const pct = Math.round(d.confidence * 100);
+  banner.style.display = 'block';
+  if (d.match) {
+    banner.className = 'match-banner match';
+    banner.innerHTML = `✅  MATCH &nbsp;·&nbsp; Confidence ${pct}%`;
+  } else {
+    banner.className = 'match-banner nomatch';
+    banner.innerHTML = `❌  NO MATCH &nbsp;·&nbsp; Best score ${pct}%`;
+  }
+
+  panel.classList.remove('hidden');
+  $('verify-metrics').innerHTML = `
+    <div class="metric-item">
+      <div class="label">Confidence</div>
+      <div class="value ${d.match ? 'quality-ring good' : 'quality-ring bad'}">${pct}%</div>
+    </div>
+    <div class="metric-item">
+      <div class="label">Threshold</div>
+      <div class="value">${Math.round(d.threshold_used * 100)}%</div>
+    </div>
+    <div class="metric-item">
+      <div class="label">Processing</div>
+      <div class="value">${d.processing_time_ms?.toFixed(0)}ms</div>
+    </div>
+    <div class="metric-item">
+      <div class="label">Best Face ID</div>
+      <div class="value text-sm">${d.best_matching_face_id?.slice(0, 8)}…</div>
+    </div>
+  `;
+
+  const q = d.query_face_quality;
+  if (q) {
+    $('verify-quality').innerHTML = `
+      <div class="sep"></div>
+      <div class="text-sm" style="margin-bottom:8px;color:var(--muted)">Query face quality</div>
+      <div class="metrics">
+        <div class="metric-item"><div class="label">Overall</div><div class="value">${Math.round(q.overall_score*100)}%</div></div>
+        <div class="metric-item"><div class="label">Blur</div><div class="value">${Math.round(q.blur_score*100)}%</div></div>
+        <div class="metric-item"><div class="label">Brightness</div><div class="value">${Math.round(q.brightness*100)}%</div></div>
+        <div class="metric-item"><div class="label">Confidence</div><div class="value">${Math.round(q.face_confidence*100)}%</div></div>
+      </div>
+    `;
+  }
+
+  if (d.all_scores?.length > 1) {
+    const rows = d.all_scores.map(s =>
+      `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+        <span class="text-sm">${s.face_id.slice(0,8)}…</span>
+        <span class="text-sm" style="color:${s.similarity >= d.threshold_used ? 'var(--success)' : 'var(--muted)'}">${Math.round(s.similarity*100)}%</span>
+       </div>`
+    ).join('');
+    $('verify-scores').innerHTML = `
+      <div class="sep"></div>
+      <div class="text-sm" style="margin-bottom:8px;color:var(--muted)">All face scores</div>
+      ${rows}
+    `;
+  } else {
+    $('verify-scores').innerHTML = '';
+  }
+}
+
+// -----------------------------------------------------------------------
+// Manage — create / list / delete
+// -----------------------------------------------------------------------
+async function createUser() {
+  const userId = $('manage-user').value.trim();
+  if (!userId) return;
+  const resp = await apiFetch('/v1/users', {
+    method: 'POST',
+    body: JSON.stringify({ external_id: userId })
+  });
+  showResult('manage-result', resp, !resp.success);
+}
+
+async function listFaces() {
+  const userId = $('manage-user').value.trim() || $('enroll-user').value.trim();
+  if (!userId) return;
+
+  const resp = await apiFetch(`/v1/users/${userId}/faces`);
+  if (!resp.success) {
+    $('faces-panel').classList.add('hidden');
+    return;
+  }
+
+  const faces = resp.data.faces;
+  $('faces-count').textContent = `${faces.length} / ${resp.data.max_allowed}`;
+  $('faces-panel').classList.remove('hidden');
+
+  if (faces.length === 0) {
+    $('faces-grid').innerHTML = '<div class="text-sm" style="padding:10px">No faces enrolled yet.</div>';
+    return;
+  }
+
+  $('faces-grid').innerHTML = faces.map(f => {
+    const q = Math.round(f.quality_score * 100);
+    const cls = q >= 70 ? 'var(--success)' : q >= 50 ? 'var(--warn)' : 'var(--error)';
+    return `
+      <div class="face-card">
+        <div class="face-icon">🧑</div>
+        <div class="face-label">${f.label || 'Face'}</div>
+        <div class="text-sm">${f.face_id.slice(0,8)}…</div>
+        <div class="quality-bar"><div class="quality-fill" style="width:${q}%;background:${cls}"></div></div>
+        <div class="text-sm">${q}% quality</div>
+        <button class="btn-sm btn-danger" style="margin-top:6px;width:100%" onclick="deleteFace('${userId}','${f.face_id}')">Delete</button>
+      </div>`;
+  }).join('');
+}
+
+async function deleteFace(userId, faceId) {
+  if (!confirm('Delete this face?')) return;
+  const resp = await apiFetch(`/v1/users/${userId}/faces/${faceId}`, { method: 'DELETE' });
+  showResult('manage-result', resp, !resp.success);
+  listFaces();
+}
+
+async function deleteUser() {
+  const userId = $('manage-user').value.trim();
+  if (!userId) return;
+  if (!confirm(`Delete user "${userId}" and all their faces?`)) return;
+  const resp = await apiFetch(`/v1/users/${userId}`, { method: 'DELETE' });
+  showResult('manage-result', resp, !resp.success);
+  $('faces-panel').classList.add('hidden');
+}
+</script>
+</body>
+</html>

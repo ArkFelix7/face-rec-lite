@@ -9,6 +9,7 @@ from typing import AsyncGenerator
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -98,6 +99,12 @@ def create_app(
     # -----------------------------------------------------------------------
     # Middleware (added last → executes first on request)
     # -----------------------------------------------------------------------
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.add_middleware(RequestLoggerMiddleware)
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(AuthMiddleware)

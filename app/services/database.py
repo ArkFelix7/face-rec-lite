@@ -15,8 +15,8 @@ from app.models.user import User
 
 
 def _utcnow() -> datetime:
-    """Return the current UTC time as a timezone-aware datetime."""
-    return datetime.now(tz=timezone.utc)
+    """Return the current UTC time as a naive datetime (matches TIMESTAMP WITHOUT TIME ZONE columns)."""
+    return datetime.utcnow()
 
 
 class DatabaseService:
