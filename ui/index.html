@@ -387,8 +387,29 @@ function showResult(elId, data, isError = false) {
   el.className = 'result-box ' + (isError ? 'error' : 'success');
 }
 
+function showError(elId, msg) {
+  const el = $(elId);
+  el.textContent = '⚠️  ' + msg;
+  el.className = 'result-box error';
+}
+
 function hideResult(elId) {
   $(elId).className = 'result-box hidden';
+}
+
+function setLoading(btnId, loading, label = 'Submit') {
+  const btn = $(btnId);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.textContent = loading ? '⏳ Working…' : label;
+}
+
+function guardKey() {
+  if (!apiKey()) {
+    alert('Paste your API key into the "API Key" field first (top of page).');
+    return false;
+  }
+  return true;
 }
 
 // -----------------------------------------------------------------------
@@ -507,27 +528,37 @@ async function previewVerifyFile(evt) {
 // Enroll
 // -----------------------------------------------------------------------
 async function doEnroll(imageB64) {
+  if (!guardKey()) return;
   const userId = $('enroll-user').value.trim();
   const label  = $('enroll-label').value.trim() || null;
-  if (!userId) { alert('Enter a user ID'); return; }
+  if (!userId) { alert('Enter a User ID first'); return; }
 
-  // Ensure user exists
-  await apiFetch('/v1/users', {
-    method: 'POST',
-    body: JSON.stringify({ external_id: userId })
-  });
+  setLoading('enroll-capture-btn', true, 'Capture & Enroll');
+  setLoading('enroll-file-btn',    true, 'Enroll from File');
+  try {
+    // Ensure user exists (ignore 409 duplicate)
+    await apiFetch('/v1/users', {
+      method: 'POST',
+      body: JSON.stringify({ external_id: userId })
+    });
 
-  const resp = await apiFetch(`/v1/users/${userId}/faces`, {
-    method: 'POST',
-    body: JSON.stringify({ image: imageB64, label })
-  });
+    const resp = await apiFetch(`/v1/users/${userId}/faces`, {
+      method: 'POST',
+      body: JSON.stringify({ image: imageB64, label })
+    });
 
-  if (resp.success) {
-    showResult('enroll-result', resp);
-    renderEnrollQuality(resp.data);
-    listFaces();
-  } else {
-    showResult('enroll-result', resp, true);
+    if (resp.success) {
+      showResult('enroll-result', resp);
+      renderEnrollQuality(resp.data);
+      listFaces();
+    } else {
+      showResult('enroll-result', resp, true);
+    }
+  } catch (err) {
+    showError('enroll-result', 'Network error: ' + err.message + '. Check API URL and that the server is running.');
+  } finally {
+    setLoading('enroll-capture-btn', false, 'Capture & Enroll');
+    setLoading('enroll-file-btn',    false, 'Enroll from File');
   }
 }
 
@@ -580,16 +611,28 @@ function renderEnrollQuality(data) {
 // Verify
 // -----------------------------------------------------------------------
 async function doVerify(imageB64) {
+  if (!guardKey()) return;
   const userId    = $('verify-user').value.trim();
   const threshold = parseFloat($('verify-threshold').value) || 0.60;
-  if (!userId) { alert('Enter a user ID'); return; }
+  if (!userId) { alert('Enter a User ID first'); return; }
 
-  const resp = await apiFetch(`/v1/users/${userId}/verify`, {
-    method: 'POST',
-    body: JSON.stringify({ image: imageB64, threshold })
-  });
-
-  renderVerifyResult(resp);
+  setLoading('verify-capture-btn', true, 'Capture & Verify');
+  setLoading('verify-file-btn',    true, 'Verify from File');
+  try {
+    const resp = await apiFetch(`/v1/users/${userId}/verify`, {
+      method: 'POST',
+      body: JSON.stringify({ image: imageB64, threshold })
+    });
+    renderVerifyResult(resp);
+  } catch (err) {
+    const banner = $('match-banner');
+    banner.className = 'match-banner nomatch';
+    banner.style.display = 'block';
+    banner.textContent = '⚠️ Network error: ' + err.message;
+  } finally {
+    setLoading('verify-capture-btn', false, 'Capture & Verify');
+    setLoading('verify-file-btn',    false, 'Verify from File');
+  }
 }
 
 async function captureAndVerify() {

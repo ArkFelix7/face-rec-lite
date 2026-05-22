@@ -97,17 +97,19 @@ def create_app(
         app.state.face_ml = face_ml
 
     # -----------------------------------------------------------------------
-    # Middleware (added last → executes first on request)
+    # Middleware — Starlette applies in LIFO order (last added = outermost).
+    # CORS must be outermost so preflight OPTIONS requests are answered before
+    # AuthMiddleware rejects them with 401.
     # -----------------------------------------------------------------------
+    app.add_middleware(RequestLoggerMiddleware)
+    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(AuthMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.add_middleware(RequestLoggerMiddleware)
-    app.add_middleware(RateLimitMiddleware)
-    app.add_middleware(AuthMiddleware)
 
     # -----------------------------------------------------------------------
     # Routers
